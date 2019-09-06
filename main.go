@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/amimof/huego"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
@@ -40,31 +39,11 @@ func appview_handler(w http.ResponseWriter, r *http.Request) {
 	state.Hue.Config = hue_load_config()
 	for i, _ := range state.Tasmota {
 		responseData := tasmota_stat(state.Tasmota[i].Feed, "Status")
-		var status TasmotaStatusResponse
-		println("json TasmotaStatusResponse")
-		err := json.Unmarshal(responseData, &status)
-		if err != nil {
-			println(err.Error())
-			_, err := fmt.Fprintf(w, "{\"result\": \"%s\"}", err.Error())
-			if err != nil {
-				println("Error", err)
-			}
-			return
-		}
+		status := tasmota_status_response_unmarshal(responseData)
 		state.Tasmota[i].Status = status.Status
 
 		responseData = tasmota_stat_result(state.Tasmota[i].Feed, "Color")
-		var colorState ColorState
-		println("json ColorState")
-		err = json.Unmarshal(responseData, &colorState)
-		if err != nil {
-			println(err.Error())
-			_, err := fmt.Fprintf(w, "{\"result\": \"%s\"}", err.Error())
-			if err != nil {
-				println("Error", err)
-			}
-			return
-		}
+		colorState := tasmota_color_unmarshal(responseData)
 		state.Tasmota[i].Color = colorState.Color[:len(colorState.Color)-2]
 		state.Tasmota[i].White = colorState.Color[len(colorState.Color)-2:]
 	}
@@ -183,18 +162,9 @@ func tasmota_delete_handler(w http.ResponseWriter, req *http.Request) {
 		}
 		return
 	}
-	println(string(body))
-	var t TasmotaDevice
-	println("json TasmotaDevice")
-	err = json.Unmarshal(body, &t)
-	if err != nil {
-		println(err.Error())
-		_, err := fmt.Fprintf(w, "{\"result\": \"%s\"}", err.Error())
-		if err != nil {
-			println("Error", err)
-		}
-		return
-	}
+
+	t := tasmota_device_unmarshal(body)
+
 	tasmota_delete(t.Feed)
 	_, err = fmt.Fprintf(w, "{\"result\": \"OK\"}")
 	if err != nil {
@@ -212,18 +182,7 @@ func tasmota_add_handler(w http.ResponseWriter, req *http.Request) {
 		}
 		return
 	}
-	println(string(body))
-	var t TasmotaDevice
-	println("json TasmotaDevice")
-	err = json.Unmarshal(body, &t)
-	if err != nil {
-		println(err.Error())
-		_, err := fmt.Fprintf(w, "{\"result\": \"%s\"}", err.Error())
-		if err != nil {
-			println("Error", err)
-		}
-		return
-	}
+	t := tasmota_device_unmarshal(body)
 	tasmota_add(t)
 	_, err = fmt.Fprintf(w, "{\"result\": \"OK\"}")
 	if err != nil {
