@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	_ "github.com/mattn/go-sqlite3"
@@ -131,9 +132,10 @@ func tasmota_stat(feed string, prop string) []byte {
 	return output
 }
 
+//TODO: Add MQTT Broker as config var
 func tasmota_stat_result(feed string, prop string) []byte {
 	output := make([]byte, 0)
-	opts := mqtt.NewClientOptions().AddBroker("tcp://moi:1883")
+	opts := mqtt.NewClientOptions().AddBroker("tcp://192.168.178.37:1883")
 	client := mqtt.NewClient(opts)
 	if token := client.Connect(); token.Wait() && token.Error() != nil {
 		println(token.Error())
@@ -160,58 +162,52 @@ func tasmota_stat_result(feed string, prop string) []byte {
 	return output
 }
 
-func tasmota_status_response_unmarshal(data []byte) TasmotaStatusResponse {
+func tasmota_status_response_unmarshal(data []byte) (*TasmotaStatusResponse, error) {
 	var t TasmotaStatusResponse
 	println("json TasmotaDevice")
 	if len(data) == 0 {
 		println("TasmotaStatusResponse unmarshal failed: no data")
-		return t
+		return nil, errors.New("TasmotaStatusResponse unmarshal failed: no data")
 	}
 	err := json.Unmarshal(data, &t)
 	if err != nil {
 		println("JSON", err.Error())
-		if err != nil {
-			println("Error", err.Error())
-		}
+		return nil, errors.New("JSON failure")
 	}
-	return t
+	return &t, nil
 }
 
-func tasmota_color_unmarshal(data []byte) ColorState {
+func tasmota_color_unmarshal(data []byte) (*ColorState, error) {
 	var t ColorState
 	println("json ColorState")
 	if len(data) == 0 {
 		println("TasmotaStatusResponse unmarshal failed: no data")
-		return t
+		return nil, errors.New("TasmotaStatusResponse unmarshal failed: no data")
 	}
 	err := json.Unmarshal(data, &t)
 	if err != nil {
 		println("JSON", err.Error())
-		if err != nil {
-			println("Error", err.Error())
-		}
+		return nil, errors.New(err.Error())
 	}
-	return t
+	return &t, nil
 }
 
-func tasmota_device_unmarshal(data []byte) TasmotaDevice {
+func tasmota_device_unmarshal(data []byte) (*TasmotaDevice, error) {
 	var t TasmotaDevice
 	println("json TasmotaDevice")
 	if len(data) == 0 {
 		println("TasmotaDevice unmarshal failed: no data")
-		return t
+		return nil, errors.New("TasmotaDevice unmarshal failed: no data")
 	}
 	err := json.Unmarshal(data, &t)
 	if err != nil {
 		println("JSON", err.Error())
-		if err != nil {
-			println("Error", err.Error())
-		}
+		return nil, errors.New(err.Error())
 	}
-	return t
+	return &t, nil
 }
 
-func tasmota_add(device TasmotaDevice) {
+func tasmota_add(device *TasmotaDevice) {
 	println("tasmota_add", device.Feed)
 	db, err := sql.Open("sqlite3", "./huelishous.db")
 	if err != nil {

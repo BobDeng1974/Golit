@@ -39,11 +39,27 @@ func appview_handler(w http.ResponseWriter, r *http.Request) {
 	state.Hue.Config = hue_load_config()
 	for i, _ := range state.Tasmota {
 		responseData := tasmota_stat(state.Tasmota[i].Feed, "Status")
-		status := tasmota_status_response_unmarshal(responseData)
+		status, jerr := tasmota_status_response_unmarshal(responseData)
+		if jerr != nil {
+			_, lateErr := fmt.Fprint(w, jerr.Error())
+			if lateErr != nil {
+				println("Fatal error!")
+				return
+			}
+			return
+		}
 		state.Tasmota[i].Status = status.Status
 
 		responseData = tasmota_stat_result(state.Tasmota[i].Feed, "Color")
-		colorState := tasmota_color_unmarshal(responseData)
+		colorState, jerr := tasmota_color_unmarshal(responseData)
+		if jerr != nil {
+			_, lateErr := fmt.Fprint(w, jerr.Error())
+			if lateErr != nil {
+				println("Fatal error!")
+				return
+			}
+			return
+		}
 		if len(colorState.Color) > 0 {
 			state.Tasmota[i].Color = colorState.Color[:len(colorState.Color)-2]
 			state.Tasmota[i].White = colorState.Color[len(colorState.Color)-2:]
@@ -165,7 +181,15 @@ func tasmota_delete_handler(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	t := tasmota_device_unmarshal(body)
+	t, jerr := tasmota_device_unmarshal(body)
+	if jerr != nil {
+		_, lateErr := fmt.Fprint(w, jerr.Error())
+		if lateErr != nil {
+			println("Fatal error!")
+			return
+		}
+		return
+	}
 
 	tasmota_delete(t.Feed)
 	_, err = fmt.Fprintf(w, "{\"result\": \"OK\"}")
@@ -184,7 +208,15 @@ func tasmota_add_handler(w http.ResponseWriter, req *http.Request) {
 		}
 		return
 	}
-	t := tasmota_device_unmarshal(body)
+	t, jerr := tasmota_device_unmarshal(body)
+	if jerr != nil {
+		_, lateErr := fmt.Fprint(w, jerr.Error())
+		if lateErr != nil {
+			println("Fatal error!")
+			return
+		}
+		return
+	}
 	tasmota_add(t)
 	_, err = fmt.Fprintf(w, "{\"result\": \"OK\"}")
 	if err != nil {
