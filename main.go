@@ -41,6 +41,7 @@ func appview_handler(w http.ResponseWriter, r *http.Request) {
 	for i, _ := range state.Tasmota {
 		responseData := tasmota_stat(state.Tasmota[i].Feed, "Status")
 		var status TasmotaStatusResponse
+		println("json TasmotaStatusResponse")
 		err := json.Unmarshal(responseData, &status)
 		if err != nil {
 			println(err.Error())
@@ -54,6 +55,7 @@ func appview_handler(w http.ResponseWriter, r *http.Request) {
 
 		responseData = tasmota_stat_result(state.Tasmota[i].Feed, "Color")
 		var colorState ColorState
+		println("json ColorState")
 		err = json.Unmarshal(responseData, &colorState)
 		if err != nil {
 			println(err.Error())
@@ -183,6 +185,7 @@ func tasmota_delete_handler(w http.ResponseWriter, req *http.Request) {
 	}
 	println(string(body))
 	var t TasmotaDevice
+	println("json TasmotaDevice")
 	err = json.Unmarshal(body, &t)
 	if err != nil {
 		println(err.Error())
@@ -211,6 +214,7 @@ func tasmota_add_handler(w http.ResponseWriter, req *http.Request) {
 	}
 	println(string(body))
 	var t TasmotaDevice
+	println("json TasmotaDevice")
 	err = json.Unmarshal(body, &t)
 	if err != nil {
 		println(err.Error())
