@@ -105,7 +105,7 @@ func tasmota_delete(device_feed string) {
 
 func tasmota_stat(feed string, prop string) []byte {
 	output := make([]byte, 0)
-	opts := mqtt.NewClientOptions().AddBroker("tcp://moi:1883")
+	opts := mqtt.NewClientOptions().AddBroker("tcp://192.168.178.37:1883")
 	client := mqtt.NewClient(opts)
 	if token := client.Connect(); token.Wait() && token.Error() != nil {
 		println(token.Error())

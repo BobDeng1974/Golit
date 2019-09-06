@@ -237,7 +237,7 @@ func mqtt_cmd_handler(w http.ResponseWriter, r *http.Request) {
 	for _, element := range cmds {
 		println("\t", element)
 	}
-	opts := mqtt.NewClientOptions().AddBroker("tcp://moi:1883")
+	opts := mqtt.NewClientOptions().AddBroker("tcp://192.168.178.37:1883")
 	client := mqtt.NewClient(opts)
 	if token := client.Connect(); token.Wait() && token.Error() != nil {
 		println(token.Error())
