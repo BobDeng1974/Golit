@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Huelishous</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.7.5/css/bulma.min.css">
+    <script src="view/app.js"></script>
+    <script defer src="https://use.fontawesome.com/releases/v5.3.1/js/all.js"></script>
+</head>
+<body>
+    <section class="section">
+        <div class="container">
+            <h1 class="title">Add Tasmota Device</h1>
+            <div class="field">
+                <p class="control has-icons-left has-icons-right">
+                    <input id="new_feed" class="input" type="email" placeholder="Feed">
+                    <span class="icon is-small is-left">
+                        <i class="fas fa-rss"></i>
+                    </span>
+                </p>
+            </div>
+            <div class="field is-grouped">
+                <div class="control">
+                    <button class="button is-link" onclick="tasmota_add()">Add</button>
+                </div>
+                <div class="control">
+                    <button class="button is-text" onclick="app_cancel()">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </section>
+</body>
+</html>

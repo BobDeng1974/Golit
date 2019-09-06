@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Huelishous</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.7.5/css/bulma.min.css">
+    <link rel="stylesheet" href="view/style.css">
+    <script src="view/app.js"></script>
+    <script defer src="https://use.fontawesome.com/releases/v5.3.1/js/all.js"></script>
+
+</head>
+<body>
+<section class="section">
+    <div class="container">
+        <h1 class="title">
+            Tasmota Devices
+        </h1>
+        <div>
+            <a href="tasmota_add" class="button is-info">
+                                        <span class="icon is-small">
+                                            <i class="fas fa-plus"></i>
+                                        </span>
+            </a>
+            <a onclick="app_reload()" class="button is-info">
+                                        <span class="icon is-small">
+                                            <i class="fas fa-sync"></i>
+                                        </span>
+            </a>
+        </div>
+        <hr/>
+        <div class="tile is-ancestor">
+            {{range .Tasmota}}
+                <div class="tile is-parent">
+                    <article class="tile is-child">
+                        <div class="card">
+                            <div class="card-content">
+                                <p>
+                                <h2 class="subtitle">
+                                    <a onclick="tasmota_delete({{.Feed}})">
+                                        <span class="icon is-small">
+                                            <i class="fas fa-trash-alt"></i>
+                                        </span>
+                                    </a>
+                                    {{index .Status.FriendlyName 0}}
+                                    <span class="status status_{{.Status.Power}}"></span>
+                                </h2>
+                                </p>
+                                <p>
+                                    <input class="button" type="color" id="{{.Feed}}_color" name="{{.Feed}}_color"
+                                           value="#{{.Color}}">
+
+                                    <input class="slider" type="range" min="0" max="255" value="0" class="slider"
+                                           id="{{.Feed}}_white" name="{{.Feed}}_white">
+                                    <script>set_slider_hex({{.Feed}}, "{{.White}}");</script>
+                                    <label for="{{.Feed}}_white">White</label>
+                                <div class="buttons has-addons is-right">
+                                    <a onclick="tasmota_setColor({{.Feed}})" class="button is-primary">Set Color</a>
+                                    <a onclick="tasmota_toggle({{.Feed}})" class="button is-danger">Toggle</a>
+                                </div>
+                                </p>
+                            </div>
+                        </div>
+                    </article>
+                </div>
+            {{end}}
+        </div>
+    </div>
+</section>
+<section class="section">
+    <div class="container">
+        <h1 class="title">Hue Devices</h1>
+        <div>
+            <a href="" class="button is-info">
+                                            <span class="icon is-small">
+                                                <i class="fas fa-plus"></i>
+                                            </span>
+            </a>
+            <a onclick="app_reload()" class="button is-info">
+                                            <span class="icon is-small">
+                                                <i class="fas fa-sync"></i>
+                                            </span>
+            </a>
+            <a href="hue_setup" class="button is-info">
+                                            <span class="icon is-small">
+                                                <i class="fas fa-plug"></i>
+                                            </span>
+            </a>
+        </div>
+        <hr/>
+        <div class="tile is-ancestor">
+            {{range .Hue.Lights}}
+                <div class="tile is-parent">
+                    <article class="tile is-child">
+                        <div class="card">
+                            <div class="card-content">
+                                <p>
+                                <h2 class="subtitle">
+                                    {{.Name}}
+                                    <span id="status_{{.UniqueID}}" class="status status_{{.State.On}}"></span>
+                                </h2>
+
+                                <div class="select">
+                                    <select id="scenes_{{.UniqueID}}">
+                                        {{range $.Hue.Scenes}}
+                                            <option value="{{.ID}}">{{.Name}}</option>
+                                        {{end}}
+                                    </select>
+                                </div>
+                                <div class="control">
+                                    <label class="radio">
+                                        <input type="radio" name="{{.UniqueID}}_switch"
+                                               onchange="hue_on({{.UniqueID}})" {{if .State.On}} checked {{end}}>
+                                        On
+                                    </label>
+                                    <label class="radio">
+                                        <input type="radio" name="{{.UniqueID}}_switch" id="{{.UniqueID}}_off"
+                                               onchange="hue_off({{.UniqueID}})" {{if not .State.On}} checked {{end}}>
+                                        Off
+                                    </label>
+                                </div>
+                                <div class="buttons has-addons is-right">
+                                    <a onclick="hue_setScene({{.UniqueID}})" class="button is-primary">Set Scene</a>
+                                </div>
+                                </p>
+                            </div>
+                        </div>
+                    </article>
+                </div>
+            {{end}}
+        </div>
+    </div>
+</section>
+</body>
+</html>
