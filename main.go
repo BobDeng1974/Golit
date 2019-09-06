@@ -44,8 +44,10 @@ func appview_handler(w http.ResponseWriter, r *http.Request) {
 
 		responseData = tasmota_stat_result(state.Tasmota[i].Feed, "Color")
 		colorState := tasmota_color_unmarshal(responseData)
-		state.Tasmota[i].Color = colorState.Color[:len(colorState.Color)-2]
-		state.Tasmota[i].White = colorState.Color[len(colorState.Color)-2:]
+		if len(colorState.Color) > 0 {
+			state.Tasmota[i].Color = colorState.Color[:len(colorState.Color)-2]
+			state.Tasmota[i].White = colorState.Color[len(colorState.Color)-2:]
+		}
 	}
 
 	if state.Hue.Config.Paired {
