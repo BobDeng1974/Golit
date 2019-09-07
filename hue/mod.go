@@ -1,25 +1,26 @@
-package main
+package hue
 
 import (
 	"database/sql"
+	"errors"
 	"github.com/amimof/huego"
 	"log"
 )
 
-type HueDevice struct {
+type Device struct {
 	Lights []huego.Light
 	Scenes []huego.Scene
-	Config HueConfig
+	Config Config
 }
 
-type HueConfig struct {
+type Config struct {
 	IP     string
 	User   string
 	Paired bool
 }
 
-func hue_pair() {
-	cfg := hue_load_config()
+func Pair() error {
+	cfg := LoadConfig()
 	bridge, _ := huego.Discover()
 	user, _ := bridge.CreateUser("Golit") // Link button needs to be pressed
 
@@ -27,46 +28,51 @@ func hue_pair() {
 	cfg.User = user
 	cfg.IP = bridge.Host
 
-	update_config(&cfg)
-	println("Hue paired!", cfg.User, cfg.IP)
-}
-
-func hue_set_scene(scene string, bridge *huego.Bridge) {
-	_, err := bridge.RecallScene(scene, 0)
-	if err != nil {
-		println("Hue error", err.Error())
+	UpdateConfig(&cfg)
+	if len(cfg.IP) > 0 && len(cfg.User) > 0 {
+		log.Print("Hue paired!", cfg.User, cfg.IP)
+		return nil
+	} else {
+		return errors.New("Pairing failed")
 	}
 }
 
-func hue_light_on(luid string, bridge *huego.Bridge) {
+func SetScene(scene string, bridge *huego.Bridge) {
+	_, err := bridge.RecallScene(scene, 0)
+	if err != nil {
+		log.Print("Hue error", err.Error())
+	}
+}
+
+func LightOn(luid string, bridge *huego.Bridge) {
 	lights, err := bridge.GetLights()
 	for _, elem := range lights {
 		if elem.UniqueID == luid {
 			err := elem.On()
 			if err != nil {
-				println("Hue error", err.Error())
+				log.Print("Hue error", err.Error())
 			}
 			return
 		}
 	}
 	if err != nil {
-		println("Hue error", err.Error())
+		log.Print("Hue error", err.Error())
 	}
 }
 
-func hue_light_off(luid string, bridge *huego.Bridge) {
+func LightOff(luid string, bridge *huego.Bridge) {
 	lights, err := bridge.GetLights()
 	for _, elem := range lights {
 		if elem.UniqueID == luid {
 			err := elem.Off()
 			if err != nil {
-				println("Hue error", err.Error())
+				log.Print("Hue error", err.Error())
 			}
 			return
 		}
 	}
 	if err != nil {
-		println("Hue error", err.Error())
+		log.Print("Hue error", err.Error())
 	}
 }
 
@@ -78,7 +84,7 @@ func bool_str(a bool) string {
 	}
 }
 
-func update_config(cfg *HueConfig) {
+func UpdateConfig(cfg *Config) {
 	update_config_entry("hue_ip", cfg.IP)
 	update_config_entry("hue_user", cfg.User)
 	update_config_entry("hue_registered", bool_str(cfg.Paired))
@@ -87,27 +93,27 @@ func update_config(cfg *HueConfig) {
 func update_config_entry(key string, value string) {
 	db, err := sql.Open("sqlite3", "./huelishous.db")
 	if err != nil {
-		println(err.Error())
+		log.Print(err.Error())
 	}
 	defer db.Close()
 	tx, err := db.Begin()
 	if err != nil {
-		println(err.Error())
+		log.Print(err.Error())
 	}
 	stmt, err := tx.Prepare("UPDATE config SET Value = ? WHERE Key = ?")
 	if err != nil {
-		println(err.Error())
+		log.Print(err.Error())
 	}
 	defer stmt.Close()
 	_, err = stmt.Exec(value, key)
 	err = tx.Commit()
 	if err != nil {
-		println(err.Error())
+		log.Print(err.Error())
 	}
 }
 
-func hue_load_config() HueConfig {
-	cfg := HueConfig{}
+func LoadConfig() Config {
+	cfg := Config{}
 	db, err := sql.Open("sqlite3", "./huelishous.db")
 	if err != nil {
 		log.Fatal(err)
