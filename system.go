@@ -1,14 +1,11 @@
 package main
 
-import "io/ioutil"
+import (
+	"io/ioutil"
+)
 
 type StaticFile struct {
 	Data []byte
-}
-
-type ConfigEntry struct {
-	Key   string
-	Value string
 }
 
 func load_static(path string) (*StaticFile, error) {

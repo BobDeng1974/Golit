@@ -1,12 +1,11 @@
 package main
 
 import (
-	"fmt"
 	"github.com/amimof/huego"
-	mqtt "github.com/eclipse/paho.mqtt.golang"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"sirjson/golit/common"
 	"sirjson/golit/hue"
 	"sirjson/golit/tasmota"
 	"strings"
@@ -21,8 +20,9 @@ func appview_handler(w http.ResponseWriter, r *http.Request) {
 	state := &AppViewState{Tasmota: []tasmota.Device{}, Hue: hue.Device{}}
 	state.Tasmota = tasmota.Fetch()
 	state.Hue.Config = hue.LoadConfig()
+	cfg := common.LoadConfig()
 	for i, _ := range state.Tasmota {
-		responseData := tasmota.GetInfo(state.Tasmota[i].Feed, "Status", false)
+		responseData := tasmota.GetInfo(cfg.MQTTHost, state.Tasmota[i].Feed, "Status", false)
 		status, jerr := tasmota.UnmarshalStatus(responseData)
 		if jerr != nil {
 			log.Print("Unmarshal error", jerr.Error())
@@ -31,7 +31,7 @@ func appview_handler(w http.ResponseWriter, r *http.Request) {
 		}
 		state.Tasmota[i].Status = status.Status
 
-		responseData = tasmota.GetInfo(state.Tasmota[i].Feed, "Color", true)
+		responseData = tasmota.GetInfo(cfg.MQTTHost, state.Tasmota[i].Feed, "Color", true)
 		colorState, jerr := tasmota.UnmarshalColor(responseData)
 		if jerr != nil {
 			log.Print("Unmarshal error", jerr.Error())
@@ -45,12 +45,13 @@ func appview_handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if state.Hue.Config.Paired {
-		bridge, _ := huego.Discover()
-		bridge = bridge.Login(state.Hue.Config.User)
+		bridge := huego.New(state.Hue.Config.IP, state.Hue.Config.User)
 		lights, err := bridge.GetLights()
 		if err != nil {
 			log.Print("Hue error", err.Error())
 			WriteResponse(w, ErrResult(err.Error()))
+			state.Hue.Config.Paired = false
+			hue.UpdateConfig(&state.Hue.Config)
 			return
 		}
 		state.Hue.Lights = lights
@@ -59,9 +60,21 @@ func appview_handler(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			log.Print("Hue error", err.Error())
 			WriteResponse(w, ErrResult(err.Error()))
+			state.Hue.Config.Paired = false
+			hue.UpdateConfig(&state.Hue.Config)
 			return
 		}
 		state.Hue.Scenes = scenes
+
+		groups, err := bridge.GetGroups()
+		if err != nil {
+			log.Print("Hue error", err.Error())
+			WriteResponse(w, ErrResult(err.Error()))
+			state.Hue.Config.Paired = false
+			hue.UpdateConfig(&state.Hue.Config)
+			return
+		}
+		state.Hue.Groups = groups
 	}
 	Template(w, "view/app.html", state)
 }
@@ -81,7 +94,7 @@ func hue_setup_view_handler(w http.ResponseWriter, r *http.Request) {
 func hue_pairing_handler(w http.ResponseWriter, r *http.Request) {
 	hueErr := hue.Pair()
 	if hueErr != nil {
-		log.Print("Hue error", hueErr.Error())
+		log.Print("Hue pairing error ", hueErr.Error())
 		WriteResponse(w, ErrResult(hueErr.Error()))
 		return
 	}
@@ -92,8 +105,7 @@ func hue_scene_handler(w http.ResponseWriter, r *http.Request) {
 	sceneReq := r.URL.Path[len("/hue/scene/"):]
 	config := hue.LoadConfig()
 	if config.Paired {
-		bridge, _ := huego.Discover()
-		bridge = bridge.Login(config.User)
+		bridge := huego.New(config.IP, config.User)
 		hue.SetScene(sceneReq, bridge)
 		WriteResponse(w, OKResult)
 	}
@@ -104,12 +116,35 @@ func hue_light_handler(w http.ResponseWriter, r *http.Request) {
 	lightParam := strings.Split(lightReq, "/")
 	config := hue.LoadConfig()
 	if config.Paired {
-		bridge, _ := huego.Discover()
-		bridge = bridge.Login(config.User)
-		if lightParam[1] == "on" {
+		bridge := huego.New(config.IP, config.User)
+		switch lightParam[1] {
+		case "on":
 			hue.LightOn(lightParam[0], bridge)
-		} else {
+			break
+		case "off":
 			hue.LightOff(lightParam[0], bridge)
+			break
+		case "update":
+			body, err := ioutil.ReadAll(r.Body)
+			if err != nil {
+				log.Print("IO error: ", err.Error())
+				WriteResponse(w, ErrResult(err.Error()))
+				return
+			}
+
+			t, jerr := hue.UnmarshalLightUpdate(body)
+			if jerr != nil {
+				log.Print("Unmarshal error: ", jerr.Error())
+				WriteResponse(w, ErrResult(jerr.Error()))
+				return
+			}
+			uerr := hue.UpdateLight(bridge, lightParam[0], t)
+			if uerr != nil {
+				log.Print("UpdateLight error: ", uerr.Error())
+				WriteResponse(w, ErrResult(uerr.Error()))
+				return
+			}
+			break
 		}
 		WriteResponse(w, OKResult)
 	}
@@ -185,27 +220,14 @@ func mqtt_cmd_handler(w http.ResponseWriter, r *http.Request) {
 	cmdRequest := r.URL.Path[len("/mqtt/cmd/"):]
 	cmdRequest = strings.ReplaceAll(cmdRequest, "*", "#")
 	log.Print("Tasmota:", cmdRequest)
+	cfg := common.LoadConfig()
 
 	cmds := strings.Split(cmdRequest, "/")
 	if len(cmds) < 3 {
 		return
 	}
 
-	for _, element := range cmds {
-		log.Print("\t", element)
-	}
-	opts := mqtt.NewClientOptions().AddBroker("tcp://192.168.178.37:1883")
-	client := mqtt.NewClient(opts)
-	if token := client.Connect(); token.Wait() && token.Error() != nil {
-		log.Print(token.Error())
-		return
-	}
-
-	if token := client.Publish(fmt.Sprintf("cmnd/%s/%s", cmds[0], cmds[1]), 0, false, cmds[2]); token.Wait() && token.Error() != nil {
-		log.Print(token.Error())
-		return
-	}
-	client.Disconnect(100)
+	tasmota.Command(cfg.MQTTHost, cmds)
 }
 
 func mqtt_stat_handler(w http.ResponseWriter, r *http.Request) {
@@ -216,5 +238,6 @@ func mqtt_stat_handler(w http.ResponseWriter, r *http.Request) {
 		log.Print("not enough args")
 		return
 	}
-	WriteByteResponse(w, tasmota.GetInfo(cmds[0], cmds[1], false))
+	cfg := common.LoadConfig()
+	WriteByteResponse(w, tasmota.GetInfo(cfg.MQTTHost, cmds[0], cmds[1], false))
 }

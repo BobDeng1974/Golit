@@ -8,6 +8,7 @@ import (
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 	_ "github.com/mattn/go-sqlite3"
 	"log"
+	"sirjson/golit/common"
 	"strings"
 	"sync"
 )
@@ -48,7 +49,7 @@ type ColorState struct {
 
 func Delete(device_feed string) {
 	log.Print("tasmota_delete", device_feed)
-	db, err := sql.Open("sqlite3", "./huelishous.db")
+	db, err := sql.Open("sqlite3", common.DatabaseFile)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -79,9 +80,24 @@ func Delete(device_feed string) {
 	}
 }
 
-func GetInfo(feed string, prop string, subscriptionIsResult bool) []byte {
+func Command(mqtt_host string, cmds []string) {
+	opts := mqtt.NewClientOptions().AddBroker(mqtt_host)
+	client := mqtt.NewClient(opts)
+	if token := client.Connect(); token.Wait() && token.Error() != nil {
+		log.Print(token.Error())
+		return
+	}
+
+	if token := client.Publish(fmt.Sprintf("cmnd/%s/%s", cmds[0], cmds[1]), 0, false, cmds[2]); token.Wait() && token.Error() != nil {
+		log.Print(token.Error())
+		return
+	}
+	client.Disconnect(100)
+}
+
+func GetInfo(mqtt_host string, feed string, prop string, subscriptionIsResult bool) []byte {
 	output := make([]byte, 0)
-	opts := mqtt.NewClientOptions().AddBroker("tcp://192.168.178.37:1883")
+	opts := mqtt.NewClientOptions().AddBroker(mqtt_host)
 	client := mqtt.NewClient(opts)
 	if token := client.Connect(); token.Wait() && token.Error() != nil {
 		log.Print(token.Error())
@@ -157,7 +173,7 @@ func UnmarshalDevice(data []byte) (*Device, error) {
 
 func Add(device *Device) {
 	log.Print("tasmota_add", device.Feed)
-	db, err := sql.Open("sqlite3", "./huelishous.db")
+	db, err := sql.Open("sqlite3", common.DatabaseFile)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -180,7 +196,7 @@ func Add(device *Device) {
 
 func Fetch() []Device {
 	var devlist []Device
-	db, err := sql.Open("sqlite3", "./huelishous.db")
+	db, err := sql.Open("sqlite3", common.DatabaseFile)
 	if err != nil {
 		log.Fatal(err)
 	}

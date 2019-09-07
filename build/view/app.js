@@ -25,10 +25,19 @@ function hue_off(uid) {
     });
 }
 
-function hue_setScene(uid) {
-    let scene = document.getElementById("scenes_" + uid).value;
+function hue_setScene() {
+    let scene = document.getElementById("scenes").value;
     fetch('hue/scene/'+scene).then(function (response) {
     });
+}
+
+function hue_apply(uid) {
+    let ct = document.getElementById(uid + "_ct").value;
+    let bri = document.getElementById(uid + "_bri").value;
+    post_data('hue/light/'+uid+'/update', {Ct: parseInt(ct, 10), Bri: parseInt(bri,10)}).then(data => {
+        console.log(data.result);
+        window.location.href = "/";
+    }).catch(error => console.error(error));
 }
 
 function tasmota_setColor(feed) {
@@ -100,6 +109,18 @@ function post_data(url = '', data = {}) {
         .then(response => response.json()); // parses JSON response into native JavaScript objects
 }
 
+function tab_nav(target, uid) {
+    let dest = document.getElementById(target + "_" + uid);
+    let dest_tab = document.getElementById(dest.id + "_tab");
+    let active_tab = document.getElementById("tabs" + "_" + uid).querySelector(".is-active");
+    let active = document.getElementById(active_tab.id.replace("_tab",""));
+
+    active.hidden = true;
+    dest.hidden = false;
+    active_tab.classList.remove("is-active");
+    dest_tab.classList.add("is-active");
+}
+
 /*
 With these functions you can convert the CIE color space to the RGB color space and vice versa.
 
@@ -144,6 +165,10 @@ THE SOFTWARE.
 function cie_to_hex(x, y, brightness) {
     let rgb = cie_to_rgb(x,y,brightness)
     return rgb[0].toString() +","+ rgb[1].toString() + "," + rgb[2].toString()
+}
+
+function wrt(v) {
+    document.write(v)
 }
 
 /**

@@ -63,3 +63,14 @@
     background: #4CAF50; /* Green background */
     cursor: pointer; /* Cursor on hover */
 }
+
+.cards {
+    display: flex;
+    flex-direction: row;
+    flex-flow: row wrap;
+}
+
+.device {
+    width: 384px;
+    padding: 8px;
+}
