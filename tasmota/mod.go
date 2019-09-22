@@ -48,19 +48,22 @@ type ColorState struct {
 }
 
 func Delete(device_feed string) {
-	log.Print("tasmota_delete", device_feed)
+	log.Print("tasmota_delete ", device_feed)
 	db, err := sql.Open("sqlite3", common.DatabaseFile)
 	if err != nil {
-		log.Fatal(err)
+		log.Print(err)
+		return
 	}
 	defer db.Close()
 	tx, err := db.Begin()
 	if err != nil {
 		log.Print(err)
+		return
 	}
-	stmt, err := tx.Prepare("DELETE TOP 1 FROM tasmota_device WHERE Feed = ?")
+	stmt, err := tx.Prepare("DELETE FROM tasmota_device WHERE Feed = ?")
 	if err != nil {
 		log.Print(err)
+		return
 	}
 	defer stmt.Close()
 	res, err2 := stmt.Exec(device_feed)
@@ -71,12 +74,15 @@ func Delete(device_feed string) {
 		log.Print("Rows affectted", rows)
 		if err != nil {
 			log.Print(err)
+			return
 		}
 	} else {
 		log.Print(err2.Error())
+		return
 	}
 	if err != nil {
 		log.Print(err)
+		return
 	}
 }
 

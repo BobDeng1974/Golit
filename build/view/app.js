@@ -58,7 +58,6 @@ function hue_apply(uid) {
     let bri = document.getElementById(uid + "_bri").value;
     post_data('hue/light/'+uid+'/update', {Ct: parseInt(ct, 10), Bri: parseInt(bri,10)}).then(data => {
         console.log(data.result);
-        window.location.href = "/";
     }).catch(error => console.error(error));
 }
 
