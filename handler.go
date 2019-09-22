@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"github.com/amimof/huego"
 	"io/ioutil"
 	"log"
@@ -16,18 +17,67 @@ type AppViewState struct {
 	Hue     hue.Device
 }
 
+func disable_all() {
+	cfg := common.LoadConfig()
+	state := fetch_state(&cfg)
+	for _, d := range state.Tasmota {
+		var cmd []string
+		cmd = append(cmd, d.Feed)
+		cmd = append(cmd, "power")
+		cmd = append(cmd, "off")
+		tasmota.Command(cfg.MQTTHost, cmd)
+	}
+	huecfg := hue.LoadConfig()
+	bridge := huego.New(huecfg.IP, huecfg.User)
+	for _, d := range state.Hue.Lights {
+		hue.LightOff(d.UniqueID, bridge)
+	}
+}
+
+func enable_all() {
+	cfg := common.LoadConfig()
+	state := fetch_state(&cfg)
+	for _, d := range state.Tasmota {
+		var cmd []string
+		cmd = append(cmd, d.Feed)
+		cmd = append(cmd, "power")
+		cmd = append(cmd, "on")
+		tasmota.Command(cfg.MQTTHost, cmd)
+	}
+	huecfg := hue.LoadConfig()
+	bridge := huego.New(huecfg.IP, huecfg.User)
+	for _, d := range state.Hue.Lights {
+		hue.LightOn(d.UniqueID, bridge)
+	}
+}
+
+func disable_all_handler(w http.ResponseWriter, req *http.Request) {
+	disable_all()
+	fmt.Fprintf(w, JSONResult("OK"))
+}
+
+func enable_all_handler(w http.ResponseWriter, req *http.Request) {
+	enable_all()
+	fmt.Fprintf(w, JSONResult("OK"))
+}
+
 func appview_handler(w http.ResponseWriter, r *http.Request) {
+	cfg := common.LoadConfig()
+	state := fetch_state(&cfg)
+	Template(w, "view/app.html", state)
+}
+
+func fetch_state(cfg *common.Config) *AppViewState {
 	state := &AppViewState{Tasmota: []tasmota.Device{}, Hue: hue.Device{}}
 	state.Tasmota = tasmota.Fetch()
 	state.Hue.Config = hue.LoadConfig()
-	cfg := common.LoadConfig()
+
 	for i, _ := range state.Tasmota {
 		responseData := tasmota.GetInfo(cfg.MQTTHost, state.Tasmota[i].Feed, "Status", false)
 		status, jerr := tasmota.UnmarshalStatus(responseData)
 		if jerr != nil {
 			log.Print("Unmarshal error", jerr.Error())
-			WriteResponse(w, ErrResult(jerr.Error()))
-			return
+			return state
 		}
 		state.Tasmota[i].Status = status.Status
 
@@ -35,8 +85,7 @@ func appview_handler(w http.ResponseWriter, r *http.Request) {
 		colorState, jerr := tasmota.UnmarshalColor(responseData)
 		if jerr != nil {
 			log.Print("Unmarshal error", jerr.Error())
-			WriteResponse(w, ErrResult(jerr.Error()))
-			return
+			return state
 		}
 		if len(colorState.Color) > 0 {
 			state.Tasmota[i].Color = colorState.Color[:len(colorState.Color)-2]
@@ -49,34 +98,32 @@ func appview_handler(w http.ResponseWriter, r *http.Request) {
 		lights, err := bridge.GetLights()
 		if err != nil {
 			log.Print("Hue error", err.Error())
-			WriteResponse(w, ErrResult(err.Error()))
 			state.Hue.Config.Paired = false
 			hue.UpdateConfig(&state.Hue.Config)
-			return
+			return state
 		}
 		state.Hue.Lights = lights
 
 		scenes, err := bridge.GetScenes()
 		if err != nil {
 			log.Print("Hue error", err.Error())
-			WriteResponse(w, ErrResult(err.Error()))
 			state.Hue.Config.Paired = false
 			hue.UpdateConfig(&state.Hue.Config)
-			return
+			return state
 		}
 		state.Hue.Scenes = scenes
 
 		groups, err := bridge.GetGroups()
 		if err != nil {
 			log.Print("Hue error", err.Error())
-			WriteResponse(w, ErrResult(err.Error()))
 			state.Hue.Config.Paired = false
 			hue.UpdateConfig(&state.Hue.Config)
-			return
+			return state
 		}
 		state.Hue.Groups = groups
 	}
-	Template(w, "view/app.html", state)
+
+	return state
 }
 
 func add_mqtt_view_handler(w http.ResponseWriter, r *http.Request) {
@@ -95,10 +142,10 @@ func hue_pairing_handler(w http.ResponseWriter, r *http.Request) {
 	hueErr := hue.Pair()
 	if hueErr != nil {
 		log.Print("Hue pairing error ", hueErr.Error())
-		WriteResponse(w, ErrResult(hueErr.Error()))
+		fmt.Fprintf(w, JSONResult(hueErr.Error()))
 		return
 	}
-	WriteResponse(w, OKResult)
+	fmt.Fprintf(w, JSONResult("OK"))
 }
 
 func hue_scene_handler(w http.ResponseWriter, r *http.Request) {
@@ -107,7 +154,7 @@ func hue_scene_handler(w http.ResponseWriter, r *http.Request) {
 	if config.Paired {
 		bridge := huego.New(config.IP, config.User)
 		hue.SetScene(sceneReq, bridge)
-		WriteResponse(w, OKResult)
+		fmt.Fprintf(w, JSONResult("OK"))
 	}
 }
 
@@ -128,25 +175,25 @@ func hue_light_handler(w http.ResponseWriter, r *http.Request) {
 			body, err := ioutil.ReadAll(r.Body)
 			if err != nil {
 				log.Print("IO error: ", err.Error())
-				WriteResponse(w, ErrResult(err.Error()))
+				fmt.Fprintf(w, JSONResult(err.Error()))
 				return
 			}
 
 			t, jerr := hue.UnmarshalLightUpdate(body)
 			if jerr != nil {
 				log.Print("Unmarshal error: ", jerr.Error())
-				WriteResponse(w, ErrResult(jerr.Error()))
+				fmt.Fprintf(w, JSONResult(jerr.Error()))
 				return
 			}
 			uerr := hue.UpdateLight(bridge, lightParam[0], t)
 			if uerr != nil {
 				log.Print("UpdateLight error: ", uerr.Error())
-				WriteResponse(w, ErrResult(uerr.Error()))
+				fmt.Fprintf(w, JSONResult(uerr.Error()))
 				return
 			}
 			break
 		}
-		WriteResponse(w, OKResult)
+		fmt.Fprintf(w, JSONResult("OK"))
 	}
 }
 
@@ -175,7 +222,7 @@ func static_handler(w http.ResponseWriter, r *http.Request) {
 	_, err := w.Write(file.Data)
 	if err != nil {
 		log.Print("IO error", err.Error())
-		WriteResponse(w, ErrResult(err.Error()))
+		fmt.Fprintf(w, JSONResult(err.Error()))
 		return
 	}
 }
@@ -184,36 +231,36 @@ func tasmota_delete_handler(w http.ResponseWriter, req *http.Request) {
 	body, err := ioutil.ReadAll(req.Body)
 	if err != nil {
 		log.Print("IO error", err.Error())
-		WriteResponse(w, ErrResult(err.Error()))
+		fmt.Fprintf(w, JSONResult(err.Error()))
 		return
 	}
 
 	t, jerr := tasmota.UnmarshalDevice(body)
 	if jerr != nil {
 		log.Print("Unmarshal error", jerr.Error())
-		WriteResponse(w, ErrResult(jerr.Error()))
+		fmt.Fprintf(w, JSONResult(jerr.Error()))
 		return
 	}
 
 	tasmota.Delete(t.Feed)
-	WriteResponse(w, OKResult)
+	fmt.Fprintf(w, JSONResult("OK"))
 }
 
 func tasmota_add_handler(w http.ResponseWriter, req *http.Request) {
 	body, err := ioutil.ReadAll(req.Body)
 	if err != nil {
 		log.Print("Tasmota Error", err.Error())
-		WriteResponse(w, ErrResult(err.Error()))
+		fmt.Fprintf(w, JSONResult(err.Error()))
 		return
 	}
 	t, jerr := tasmota.UnmarshalDevice(body)
 	if jerr != nil {
 		log.Print("Unmarshal error", jerr.Error())
-		WriteResponse(w, ErrResult(jerr.Error()))
+		fmt.Fprintf(w, JSONResult(jerr.Error()))
 		return
 	}
 	tasmota.Add(t)
-	WriteResponse(w, OKResult)
+	fmt.Fprintf(w, JSONResult("OK"))
 }
 
 func mqtt_cmd_handler(w http.ResponseWriter, r *http.Request) {

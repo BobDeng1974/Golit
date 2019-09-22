@@ -74,3 +74,11 @@
     width: 384px;
     padding: 8px;
 }
+
+.float-right {
+    float: right;
+}
+
+.device-icon {
+    color: #fbc02d;
+}

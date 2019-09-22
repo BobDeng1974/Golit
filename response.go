@@ -7,8 +7,6 @@ import (
 	"net/http"
 )
 
-const OKResult string = "{\"result\": \"OK\"}"
-
 func WriteResponse(writer http.ResponseWriter, format string, a ...interface{}) {
 	_, err := fmt.Fprintf(writer, format, a)
 	if err != nil {
@@ -28,6 +26,6 @@ func Template(writer http.ResponseWriter, file string, data interface{}) {
 	}
 }
 
-func ErrResult(msg string) string {
+func JSONResult(msg string) string {
 	return fmt.Sprintf("{\"result\": \"%s\"}", msg)
 }

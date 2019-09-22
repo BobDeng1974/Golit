@@ -1,5 +1,27 @@
-function tasmota_toggle(feed) {
-    fetch('mqtt/cmd/' + feed + '/power/toggle').then(function (response) {
+function tasmota_on(feed) {
+    fetch('mqtt/cmd/' + feed + '/power/on').then(function (response) {
+        let stat = document.getElementById("status_" + feed);
+        stat.classList.remove("status_0");
+        stat.classList.add("status_1");
+    });
+}
+
+function tasmota_off(feed) {
+    fetch('mqtt/cmd/' + feed + '/power/off').then(function (response) {
+        let stat = document.getElementById("status_" + feed);
+        stat.classList.remove("status_1");
+        stat.classList.add("status_0");
+    });
+}
+
+function sys_on() {
+    fetch('on').then(function (response) {
+        app_reload()
+    });
+}
+
+function sys_off() {
+    fetch('off').then(function (response) {
         app_reload()
     });
 }
