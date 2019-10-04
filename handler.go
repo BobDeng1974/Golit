@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"github.com/amimof/huego"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -10,6 +9,8 @@ import (
 	"sirjson/golit/hue"
 	"sirjson/golit/tasmota"
 	"strings"
+
+	"github.com/amimof/huego"
 )
 
 type AppViewState struct {
@@ -51,6 +52,31 @@ func enable_all() {
 	}
 }
 
+func toggle_all() {
+	cfg := common.LoadConfig()
+	state := fetch_state(&cfg)
+	is_active := false
+	for _, d := range state.Tasmota {
+		if d.Status.Power == 1 {
+			is_active = true
+			break
+		}
+	}
+	if is_active == false {
+		for _, d := range state.Hue.Lights {
+			if d.State.On {
+				is_active = true
+				break
+			}
+		}
+	}
+	if is_active {
+		disable_all()
+	} else {
+		enable_all()
+	}
+}
+
 func disable_all_handler(w http.ResponseWriter, req *http.Request) {
 	disable_all()
 	fmt.Fprintf(w, JSONResult("OK"))
@@ -58,6 +84,11 @@ func disable_all_handler(w http.ResponseWriter, req *http.Request) {
 
 func enable_all_handler(w http.ResponseWriter, req *http.Request) {
 	enable_all()
+	fmt.Fprintf(w, JSONResult("OK"))
+}
+
+func toggle_handler(w http.ResponseWriter, req *http.Request) {
+	toggle_all()
 	fmt.Fprintf(w, JSONResult("OK"))
 }
 

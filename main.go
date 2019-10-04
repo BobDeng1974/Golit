@@ -6,7 +6,7 @@ import (
 )
 
 func main() {
-	log.Print("Golit v0.3")
+	log.Print("Golit v0.4")
 	http.HandleFunc("/", appview_handler)
 	http.HandleFunc("/images/", static_handler)
 	http.HandleFunc("/view/", static_handler)
@@ -21,5 +21,6 @@ func main() {
 	http.HandleFunc("/hue/light/", hue_light_handler)
 	http.HandleFunc("/off", disable_all_handler)
 	http.HandleFunc("/on", enable_all_handler)
+	http.HandleFunc("/toggle", toggle_handler)
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
