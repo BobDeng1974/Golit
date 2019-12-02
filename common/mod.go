@@ -1,8 +1,10 @@
 package common
 
 import (
-	"database/sql"
+	json "encoding/json"
+	"io/ioutil"
 	"log"
+	"os"
 )
 
 type ConfigEntry struct {
@@ -10,45 +12,45 @@ type ConfigEntry struct {
 	Value string
 }
 
-type Config struct {
-	MQTTHost string
+type HueConfig struct {
+	IP     string
+	User   string
+	Paired bool
 }
 
+type MqttConfig struct {
+	Host string
+}
+
+type Config struct {
+	MQTT MqttConfig
+	Hue  HueConfig
+}
+
+const ConfigFile string = "./config.json"
 const DatabaseFile string = "./golit.db"
+const DatabaseSetup string = "./golit.sql"
 
 func LoadConfig() Config {
-	cfg := Config{}
-	db, err := sql.Open("sqlite3", DatabaseFile)
+	config := Config{}
+	doc, err := ioutil.ReadFile(ConfigFile)
 	if err != nil {
 		log.Fatal(err)
-		return cfg
+		os.Exit(1)
 	}
-	defer db.Close()
-	rows, err := db.Query("SELECT Key, Value FROM config WHERE Key LIKE('common_%')")
-	if err != nil {
-		log.Fatal(err)
-		return cfg
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var value string
-		var key string
+	json.Unmarshal(doc, &config)
+	return config
+}
 
-		err = rows.Scan(&key, &value)
-		if err != nil {
-			log.Fatal(err)
-			return cfg
-		}
-		switch key {
-		case "common_mqtt_host":
-			cfg.MQTTHost = value
-			break
-		}
-	}
-	err = rows.Err()
+func WriteConfig(cfg *Config) {
+	data, err := json.Marshal(cfg)
 	if err != nil {
-		log.Fatal(err)
-		return cfg
+		log.Fatal("Failed to marshal config")
+		os.Exit(1)
 	}
-	return cfg
+	ioerr := ioutil.WriteFile(ConfigFile, data, 0644)
+	if ioerr != nil {
+		log.Fatal("Failed to write config")
+		os.Exit(1)
+	}
 }

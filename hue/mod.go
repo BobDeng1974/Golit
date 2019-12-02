@@ -1,7 +1,6 @@
 package hue
 
 import (
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"github.com/amimof/huego"
@@ -14,18 +13,11 @@ type Device struct {
 	Lights []huego.Light
 	Scenes []huego.Scene
 	Groups []huego.Group
-	Config Config
 }
 
 type LightUpdate struct {
 	Ct  uint16
 	Bri uint8
-}
-
-type Config struct {
-	IP     string
-	User   string
-	Paired bool
 }
 
 func UnmarshalLightUpdate(data []byte) (*LightUpdate, error) {
@@ -68,18 +60,18 @@ func Pair() error {
 	if err != nil {
 		return err
 	}
-	cfg := LoadConfig()
+	cfg := common.LoadConfig()
 	bridge, _ := huego.Discover()
 
 	user, _ := bridge.CreateUser("Golit_" + name) // Link button needs to be pressed
 
-	cfg.Paired = true
-	cfg.User = user
-	cfg.IP = bridge.Host
+	cfg.Hue.Paired = true
+	cfg.Hue.User = user
+	cfg.Hue.IP = bridge.Host
 
-	UpdateConfig(&cfg)
-	if len(cfg.IP) > 0 && len(cfg.User) > 0 {
-		log.Print("Hue paired! User", cfg.User, " Host: ", cfg.IP)
+	common.WriteConfig(&cfg)
+	if len(cfg.Hue.IP) > 0 && len(cfg.Hue.User) > 0 {
+		log.Print("Hue paired! User", cfg.Hue.User, " Host: ", cfg.Hue.IP)
 		return nil
 	} else {
 		return errors.New("Pairing failed")
@@ -131,71 +123,4 @@ func bool_str(a bool) string {
 	} else {
 		return "0"
 	}
-}
-
-func UpdateConfig(cfg *Config) {
-	update_config_entry("hue_ip", cfg.IP)
-	update_config_entry("hue_user", cfg.User)
-	update_config_entry("hue_registered", bool_str(cfg.Paired))
-}
-
-func update_config_entry(key string, value string) {
-	db, err := sql.Open("sqlite3", common.DatabaseFile)
-	if err != nil {
-		log.Print(err.Error())
-	}
-	defer db.Close()
-	tx, err := db.Begin()
-	if err != nil {
-		log.Print(err.Error())
-	}
-	stmt, err := tx.Prepare("UPDATE config SET Value = ? WHERE Key = ?")
-	if err != nil {
-		log.Print(err.Error())
-	}
-	defer stmt.Close()
-	_, err = stmt.Exec(value, key)
-	err = tx.Commit()
-	if err != nil {
-		log.Print(err.Error())
-	}
-}
-
-func LoadConfig() Config {
-	cfg := Config{}
-	db, err := sql.Open("sqlite3", common.DatabaseFile)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
-	rows, err := db.Query("SELECT Key, Value FROM config WHERE Key LIKE('hue_%')")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer rows.Close()
-	for rows.Next() {
-		var value string
-		var key string
-
-		err = rows.Scan(&key, &value)
-		if err != nil {
-			log.Fatal(err)
-		}
-		switch key {
-		case "hue_user":
-			cfg.User = value
-			break
-		case "hue_ip":
-			cfg.IP = value
-			break
-		case "hue_registered":
-			cfg.Paired = value == "1"
-			break
-		}
-	}
-	err = rows.Err()
-	if err != nil {
-		log.Fatal(err)
-	}
-	return cfg
 }

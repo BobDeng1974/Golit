@@ -1,12 +1,79 @@
 package main
 
 import (
+	"database/sql"
+	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
+	"sirjson/golit/common"
 )
 
+func file_exists(name string) bool {
+	if _, err := os.Stat(name); err == nil {
+		return true
+
+	} else if os.IsNotExist(err) {
+		return false
+
+	} else {
+		return false
+	}
+}
+
+func setup_db() {
+	script, err := ioutil.ReadFile(common.DatabaseSetup)
+	if err != nil {
+		log.Fatal("Error while loading database setup")
+		log.Fatal(err)
+		os.Exit(1)
+	}
+	db, err := sql.Open("sqlite3", common.DatabaseFile)
+	if err != nil {
+		log.Fatal("Error while open database")
+		log.Fatal(err)
+	}
+	defer db.Close()
+	_, dberr := db.Exec(string(script))
+	if dberr != nil {
+		log.Fatal("Error while exec database setup")
+		log.Fatal(dberr)
+	}
+}
+
+func setup_config() {
+	cfg := common.Config{
+		MQTT: common.MqttConfig{
+			Host: string("tcp://localhost:1883"),
+		},
+		Hue: common.HueConfig{
+			Paired: false,
+			IP:     string("127.0.0.1"),
+			User:   string("NULL"),
+		},
+	}
+
+	common.WriteConfig(&cfg)
+}
+
+func setup() {
+	if !file_exists("golit.db") {
+		log.Print("Database setup... ")
+		setup_db()
+		log.Print("done\n")
+	}
+	if !file_exists("config.json") {
+		log.Print("Config setup... ")
+		setup_config()
+		log.Print("done\n Exit now!")
+		os.Exit(0)
+	}
+}
+
 func main() {
-	log.Print("Golit v0.4")
+	bindaddr := ":8080"
+	log.Print("Golit v0.5")
+	setup()
 	http.HandleFunc("/", appview_handler)
 	http.HandleFunc("/images/", static_handler)
 	http.HandleFunc("/view/", static_handler)
@@ -22,5 +89,6 @@ func main() {
 	http.HandleFunc("/off", disable_all_handler)
 	http.HandleFunc("/on", enable_all_handler)
 	http.HandleFunc("/toggle", toggle_handler)
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Printf("Starting http server on %s", bindaddr)
+	log.Fatal(http.ListenAndServe(bindaddr, nil))
 }

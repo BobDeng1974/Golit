@@ -18,6 +18,10 @@ type AppViewState struct {
 	Hue     hue.Device
 }
 
+type SetupViewState struct {
+	Cfg common.Config
+}
+
 func disable_all() {
 	cfg := common.LoadConfig()
 	state := fetch_state(&cfg)
@@ -26,10 +30,9 @@ func disable_all() {
 		cmd = append(cmd, d.Feed)
 		cmd = append(cmd, "power")
 		cmd = append(cmd, "off")
-		tasmota.Command(cfg.MQTTHost, cmd)
+		tasmota.Command(cfg.MQTT.Host, cmd)
 	}
-	huecfg := hue.LoadConfig()
-	bridge := huego.New(huecfg.IP, huecfg.User)
+	bridge := huego.New(cfg.Hue.IP, cfg.Hue.User)
 	for _, d := range state.Hue.Lights {
 		hue.LightOff(d.UniqueID, bridge)
 	}
@@ -43,10 +46,9 @@ func enable_all() {
 		cmd = append(cmd, d.Feed)
 		cmd = append(cmd, "power")
 		cmd = append(cmd, "on")
-		tasmota.Command(cfg.MQTTHost, cmd)
+		tasmota.Command(cfg.MQTT.Host, cmd)
 	}
-	huecfg := hue.LoadConfig()
-	bridge := huego.New(huecfg.IP, huecfg.User)
+	bridge := huego.New(cfg.Hue.IP, cfg.Hue.User)
 	for _, d := range state.Hue.Lights {
 		hue.LightOn(d.UniqueID, bridge)
 	}
@@ -101,10 +103,31 @@ func appview_handler(w http.ResponseWriter, r *http.Request) {
 func fetch_state(cfg *common.Config) *AppViewState {
 	state := &AppViewState{Tasmota: []tasmota.Device{}, Hue: hue.Device{}}
 	state.Tasmota = tasmota.Fetch()
-	state.Hue.Config = hue.LoadConfig()
 
+	log.Print("Query tasmota state...")
 	for i, _ := range state.Tasmota {
-		responseData := tasmota.GetInfo(cfg.MQTTHost, state.Tasmota[i].Feed, "Status", false)
+		responseData, geterr := tasmota.GetInfo(cfg.MQTT.Host, state.Tasmota[i].Feed, "Status", false)
+		if geterr {
+			errname := make([]string, 1)
+			errname[0] = "BROKEN"
+			state.Tasmota[i].Status = tasmota.Status{
+				Module:       0,
+				FriendlyName: errname,
+				Topic:        state.Tasmota[i].Feed,
+				ButtonTopic:  state.Tasmota[i].Feed,
+				Power:        0,
+				PowerOnState: 0,
+				LedState:     0,
+				SaveData:     0,
+				SaveState:    0,
+				SwitchTopic:  state.Tasmota[i].Feed,
+				SwitchMode:   nil,
+				ButtonRetain: 0,
+				SwitchRetain: 0,
+				SensorRetain: 0,
+				PowerRetain:  0,
+			}
+		}
 		status, jerr := tasmota.UnmarshalStatus(responseData)
 		if jerr != nil {
 			log.Print("Unmarshal error", jerr.Error())
@@ -112,7 +135,28 @@ func fetch_state(cfg *common.Config) *AppViewState {
 		}
 		state.Tasmota[i].Status = status.Status
 
-		responseData = tasmota.GetInfo(cfg.MQTTHost, state.Tasmota[i].Feed, "Color", true)
+		responseData, geterr = tasmota.GetInfo(cfg.MQTT.Host, state.Tasmota[i].Feed, "Color", true)
+		if geterr {
+			errname := make([]string, 1)
+			errname[0] = "BROKEN"
+			state.Tasmota[i].Status = tasmota.Status{
+				Module:       0,
+				FriendlyName: errname,
+				Topic:        state.Tasmota[i].Feed,
+				ButtonTopic:  state.Tasmota[i].Feed,
+				Power:        0,
+				PowerOnState: 0,
+				LedState:     0,
+				SaveData:     0,
+				SaveState:    0,
+				SwitchTopic:  state.Tasmota[i].Feed,
+				SwitchMode:   nil,
+				ButtonRetain: 0,
+				SwitchRetain: 0,
+				SensorRetain: 0,
+				PowerRetain:  0,
+			}
+		}
 		colorState, jerr := tasmota.UnmarshalColor(responseData)
 		if jerr != nil {
 			log.Print("Unmarshal error", jerr.Error())
@@ -124,13 +168,14 @@ func fetch_state(cfg *common.Config) *AppViewState {
 		}
 	}
 
-	if state.Hue.Config.Paired {
-		bridge := huego.New(state.Hue.Config.IP, state.Hue.Config.User)
+	if cfg.Hue.Paired {
+		log.Print("Hue is paired! Parsing hue state...")
+		bridge := huego.New(cfg.Hue.IP, cfg.Hue.User)
 		lights, err := bridge.GetLights()
 		if err != nil {
 			log.Print("Hue error", err.Error())
-			state.Hue.Config.Paired = false
-			hue.UpdateConfig(&state.Hue.Config)
+			cfg.Hue.Paired = false
+			common.WriteConfig(cfg)
 			return state
 		}
 		state.Hue.Lights = lights
@@ -138,8 +183,8 @@ func fetch_state(cfg *common.Config) *AppViewState {
 		scenes, err := bridge.GetScenes()
 		if err != nil {
 			log.Print("Hue error", err.Error())
-			state.Hue.Config.Paired = false
-			hue.UpdateConfig(&state.Hue.Config)
+			cfg.Hue.Paired = false
+			common.WriteConfig(cfg)
 			return state
 		}
 		state.Hue.Scenes = scenes
@@ -147,8 +192,8 @@ func fetch_state(cfg *common.Config) *AppViewState {
 		groups, err := bridge.GetGroups()
 		if err != nil {
 			log.Print("Hue error", err.Error())
-			state.Hue.Config.Paired = false
-			hue.UpdateConfig(&state.Hue.Config)
+			cfg.Hue.Paired = false
+			common.WriteConfig(cfg)
 			return state
 		}
 		state.Hue.Groups = groups
@@ -164,8 +209,8 @@ func add_mqtt_view_handler(w http.ResponseWriter, r *http.Request) {
 }
 
 func hue_setup_view_handler(w http.ResponseWriter, r *http.Request) {
-	state := &AppViewState{}
-	state.Hue.Config = hue.LoadConfig()
+	state := &SetupViewState{}
+	state.Cfg = common.LoadConfig()
 	Template(w, "view/huesetup.html", state)
 }
 
@@ -181,9 +226,9 @@ func hue_pairing_handler(w http.ResponseWriter, r *http.Request) {
 
 func hue_scene_handler(w http.ResponseWriter, r *http.Request) {
 	sceneReq := r.URL.Path[len("/hue/scene/"):]
-	config := hue.LoadConfig()
-	if config.Paired {
-		bridge := huego.New(config.IP, config.User)
+	config := common.LoadConfig()
+	if config.Hue.Paired {
+		bridge := huego.New(config.Hue.IP, config.Hue.User)
 		hue.SetScene(sceneReq, bridge)
 		fmt.Fprintf(w, JSONResult("OK"))
 	}
@@ -192,9 +237,9 @@ func hue_scene_handler(w http.ResponseWriter, r *http.Request) {
 func hue_light_handler(w http.ResponseWriter, r *http.Request) {
 	lightReq := r.URL.Path[len("/hue/light/"):]
 	lightParam := strings.Split(lightReq, "/")
-	config := hue.LoadConfig()
-	if config.Paired {
-		bridge := huego.New(config.IP, config.User)
+	config := common.LoadConfig()
+	if config.Hue.Paired {
+		bridge := huego.New(config.Hue.IP, config.Hue.User)
 		switch lightParam[1] {
 		case "on":
 			hue.LightOn(lightParam[0], bridge)
@@ -305,7 +350,7 @@ func mqtt_cmd_handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tasmota.Command(cfg.MQTTHost, cmds)
+	tasmota.Command(cfg.MQTT.Host, cmds)
 }
 
 func mqtt_stat_handler(w http.ResponseWriter, r *http.Request) {
@@ -317,5 +362,8 @@ func mqtt_stat_handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	cfg := common.LoadConfig()
-	WriteByteResponse(w, tasmota.GetInfo(cfg.MQTTHost, cmds[0], cmds[1], false))
+	info, err := tasmota.GetInfo(cfg.MQTT.Host, cmds[0], cmds[1], false)
+	if !err {
+		WriteByteResponse(w, info)
+	}
 }

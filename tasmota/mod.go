@@ -11,6 +11,7 @@ import (
 	"sirjson/golit/common"
 	"strings"
 	"sync"
+	"time"
 )
 
 type Device struct {
@@ -60,7 +61,7 @@ func Delete(device_feed string) {
 		log.Print(err)
 		return
 	}
-	stmt, err := tx.Prepare("DELETE FROM tasmota_device WHERE Feed = ?")
+	stmt, err := tx.Prepare("DELETE FROM mqtt_device WHERE Feed = ?")
 	if err != nil {
 		log.Print(err)
 		return
@@ -101,13 +102,29 @@ func Command(mqtt_host string, cmds []string) {
 	client.Disconnect(100)
 }
 
-func GetInfo(mqtt_host string, feed string, prop string, subscriptionIsResult bool) []byte {
+// waitTimeout waits for the waitgroup for the specified max timeout.
+// Returns true if waiting timed out.
+func waitTimeout(wg *sync.WaitGroup, timeout time.Duration) bool {
+	c := make(chan struct{})
+	go func() {
+		defer close(c)
+		wg.Wait()
+	}()
+	select {
+	case <-c:
+		return false // completed normally
+	case <-time.After(timeout):
+		return true // timed out
+	}
+}
+
+func GetInfo(mqtt_host string, feed string, prop string, subscriptionIsResult bool) ([]byte, bool) {
 	output := make([]byte, 0)
 	opts := mqtt.NewClientOptions().AddBroker(mqtt_host)
 	client := mqtt.NewClient(opts)
 	if token := client.Connect(); token.Wait() && token.Error() != nil {
 		log.Print(token.Error())
-		return output
+		return output, true
 	}
 
 	var wg sync.WaitGroup
@@ -124,15 +141,18 @@ func GetInfo(mqtt_host string, feed string, prop string, subscriptionIsResult bo
 		wg.Done()
 	}); token.Wait() && token.Error() != nil {
 		log.Print(token.Error())
-		return output
+		return output, true
 	}
 
 	if token := client.Publish(fmt.Sprintf("cmnd/%s/%s", feed, prop), 0, false, ""); token.Wait() && token.Error() != nil {
 		log.Print(token.Error())
-		return output
+		return output, true
 	}
-	wg.Wait()
-	return output
+	if waitTimeout(&wg, time.Second*3) {
+		log.Printf("Timeout for %s", feed)
+		return output, true
+	}
+	return output, false
 }
 
 func UnmarshalStatus(data []byte) (*StatusResponse, error) {
@@ -188,7 +208,7 @@ func Add(device *Device) {
 	if err != nil {
 		log.Print(err)
 	}
-	stmt, err := tx.Prepare("INSERT INTO tasmota_device (Feed) VALUES(?)")
+	stmt, err := tx.Prepare("INSERT INTO mqtt_device (Feed) VALUES(?)")
 	if err != nil {
 		log.Print(err)
 	}
@@ -207,7 +227,7 @@ func Fetch() []Device {
 		log.Fatal(err)
 	}
 	defer db.Close()
-	rows, err := db.Query("SELECT Feed as count FROM tasmota_device")
+	rows, err := db.Query("SELECT Feed as count FROM mqtt_device")
 	if err != nil {
 		log.Fatal(err)
 	}
