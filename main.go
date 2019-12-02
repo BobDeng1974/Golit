@@ -51,6 +51,7 @@ func setup_config() {
 			IP:     string("127.0.0.1"),
 			User:   string("NULL"),
 		},
+		HostAddress: string(":9090"),
 	}
 
 	common.WriteConfig(&cfg)
@@ -71,9 +72,9 @@ func setup() {
 }
 
 func main() {
-	bindaddr := ":8080"
 	log.Print("Golit v0.5")
 	setup()
+	cfg := common.LoadConfig()
 	http.HandleFunc("/", appview_handler)
 	http.HandleFunc("/images/", static_handler)
 	http.HandleFunc("/view/", static_handler)
@@ -89,6 +90,6 @@ func main() {
 	http.HandleFunc("/off", disable_all_handler)
 	http.HandleFunc("/on", enable_all_handler)
 	http.HandleFunc("/toggle", toggle_handler)
-	log.Printf("Starting http server on %s", bindaddr)
-	log.Fatal(http.ListenAndServe(bindaddr, nil))
+	log.Printf("Starting http server on %s", cfg.HostAddress)
+	log.Fatal(http.ListenAndServe(cfg.HostAddress, nil))
 }

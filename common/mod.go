@@ -23,8 +23,9 @@ type MqttConfig struct {
 }
 
 type Config struct {
-	MQTT MqttConfig
-	Hue  HueConfig
+	MQTT        MqttConfig
+	Hue         HueConfig
+	HostAddress string
 }
 
 const ConfigFile string = "./config.json"
