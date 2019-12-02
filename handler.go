@@ -127,44 +127,26 @@ func fetch_state(cfg *common.Config) *AppViewState {
 				SensorRetain: 0,
 				PowerRetain:  0,
 			}
-		}
-		status, jerr := tasmota.UnmarshalStatus(responseData)
-		if jerr != nil {
-			log.Print("Unmarshal error", jerr.Error())
-			return state
-		}
-		state.Tasmota[i].Status = status.Status
-
-		responseData, geterr = tasmota.GetInfo(cfg.MQTT.Host, state.Tasmota[i].Feed, "Color", true)
-		if geterr {
-			errname := make([]string, 1)
-			errname[0] = "BROKEN"
-			state.Tasmota[i].Status = tasmota.Status{
-				Module:       0,
-				FriendlyName: errname,
-				Topic:        state.Tasmota[i].Feed,
-				ButtonTopic:  state.Tasmota[i].Feed,
-				Power:        0,
-				PowerOnState: 0,
-				LedState:     0,
-				SaveData:     0,
-				SaveState:    0,
-				SwitchTopic:  state.Tasmota[i].Feed,
-				SwitchMode:   nil,
-				ButtonRetain: 0,
-				SwitchRetain: 0,
-				SensorRetain: 0,
-				PowerRetain:  0,
+		} else {
+			status, jerr := tasmota.UnmarshalStatus(responseData)
+			if jerr != nil {
+				log.Print("Unmarshal error", jerr.Error())
+				return state
 			}
-		}
-		colorState, jerr := tasmota.UnmarshalColor(responseData)
-		if jerr != nil {
-			log.Print("Unmarshal error", jerr.Error())
-			return state
-		}
-		if len(colorState.Color) > 0 {
-			state.Tasmota[i].Color = colorState.Color[:len(colorState.Color)-2]
-			state.Tasmota[i].White = colorState.Color[len(colorState.Color)-2:]
+			state.Tasmota[i].Status = status.Status
+
+			responseData, geterr = tasmota.GetInfo(cfg.MQTT.Host, state.Tasmota[i].Feed, "Color", true)
+			if !geterr {
+				colorState, jerr := tasmota.UnmarshalColor(responseData)
+				if jerr != nil {
+					log.Print("Unmarshal error", jerr.Error())
+					return state
+				}
+				if len(colorState.Color) > 0 {
+					state.Tasmota[i].Color = colorState.Color[:len(colorState.Color)-2]
+					state.Tasmota[i].White = colorState.Color[len(colorState.Color)-2:]
+				}
+			}
 		}
 	}
 

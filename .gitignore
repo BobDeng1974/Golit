@@ -12,3 +12,5 @@
 *.out
 /build/config.json
 /build/golit.db
+/build/golit
+/golit
