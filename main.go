@@ -44,7 +44,8 @@ func setup_db() {
 func setup_config() {
 	cfg := common.Config{
 		MQTT: common.MqttConfig{
-			Host: string("tcp://localhost:1883"),
+			Host:         string("tcp://localhost:1883"),
+			QueryTimeout: 10,
 		},
 		Hue: common.HueConfig{
 			Paired: false,
@@ -72,7 +73,7 @@ func setup() {
 }
 
 func main() {
-	log.Print("Golit v0.5")
+	log.Print("Golit v0.5.1")
 	setup()
 	cfg := common.LoadConfig()
 	http.HandleFunc("/", appview_handler)

@@ -118,7 +118,7 @@ func waitTimeout(wg *sync.WaitGroup, timeout time.Duration) bool {
 	}
 }
 
-func GetInfo(mqtt_host string, feed string, prop string, subscriptionIsResult bool) ([]byte, bool) {
+func GetInfo(mqtt_host string, feed string, prop string, subscriptionIsResult bool, timeout time.Duration) ([]byte, bool) {
 	output := make([]byte, 0)
 	opts := mqtt.NewClientOptions().AddBroker(mqtt_host)
 	client := mqtt.NewClient(opts)
@@ -148,8 +148,8 @@ func GetInfo(mqtt_host string, feed string, prop string, subscriptionIsResult bo
 		log.Print(token.Error())
 		return output, true
 	}
-	if waitTimeout(&wg, time.Second*3) {
-		log.Printf("Timeout for %s", feed)
+	if waitTimeout(&wg, time.Second*timeout) {
+		log.Printf("Timeout for mqtt feed %s. No answer received in %d second(s).", feed, timeout)
 		return output, true
 	}
 	return output, false

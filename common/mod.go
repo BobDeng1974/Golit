@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"time"
 )
 
 type ConfigEntry struct {
@@ -19,7 +20,8 @@ type HueConfig struct {
 }
 
 type MqttConfig struct {
-	Host string
+	Host         string
+	QueryTimeout time.Duration
 }
 
 type Config struct {

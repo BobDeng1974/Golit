@@ -106,7 +106,7 @@ func fetch_state(cfg *common.Config) *AppViewState {
 
 	log.Print("Query tasmota state...")
 	for i, _ := range state.Tasmota {
-		responseData, geterr := tasmota.GetInfo(cfg.MQTT.Host, state.Tasmota[i].Feed, "Status", false)
+		responseData, geterr := tasmota.GetInfo(cfg.MQTT.Host, state.Tasmota[i].Feed, "Status", false, cfg.MQTT.QueryTimeout)
 		if geterr {
 			errname := make([]string, 1)
 			errname[0] = "BROKEN"
@@ -135,7 +135,7 @@ func fetch_state(cfg *common.Config) *AppViewState {
 			}
 			state.Tasmota[i].Status = status.Status
 
-			responseData, geterr = tasmota.GetInfo(cfg.MQTT.Host, state.Tasmota[i].Feed, "Color", true)
+			responseData, geterr = tasmota.GetInfo(cfg.MQTT.Host, state.Tasmota[i].Feed, "Color", true, cfg.MQTT.QueryTimeout)
 			if !geterr {
 				colorState, jerr := tasmota.UnmarshalColor(responseData)
 				if jerr != nil {
@@ -344,7 +344,7 @@ func mqtt_stat_handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	cfg := common.LoadConfig()
-	info, err := tasmota.GetInfo(cfg.MQTT.Host, cmds[0], cmds[1], false)
+	info, err := tasmota.GetInfo(cfg.MQTT.Host, cmds[0], cmds[1], false, cfg.MQTT.QueryTimeout)
 	if !err {
 		WriteByteResponse(w, info)
 	}
