@@ -79,22 +79,41 @@ func toggle_all() {
 	}
 }
 
+func cors_shim(w *http.ResponseWriter, req *http.Request) bool {
+	(*w).Header().Set("Access-Control-Allow-Origin", "*")
+	(*w).Header().Set("Access-Control-Allow-Methods", "POST, GET, OPTIONS, PUT, DELETE")
+	(*w).Header().Set("Access-Control-Allow-Headers", "Accept, Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization")
+	return (*req).Method == "OPTIONS"
+}
+
 func disable_all_handler(w http.ResponseWriter, req *http.Request) {
+	if cors_shim(&w, req) {
+		return
+	}
 	disable_all()
 	fmt.Fprintf(w, JSONResult("OK"))
 }
 
 func enable_all_handler(w http.ResponseWriter, req *http.Request) {
+	if cors_shim(&w, req) {
+		return
+	}
 	enable_all()
 	fmt.Fprintf(w, JSONResult("OK"))
 }
 
 func toggle_handler(w http.ResponseWriter, req *http.Request) {
+	if cors_shim(&w, req) {
+		return
+	}
 	toggle_all()
 	fmt.Fprintf(w, JSONResult("OK"))
 }
 
 func appview_handler(w http.ResponseWriter, r *http.Request) {
+	if cors_shim(&w, r) {
+		return
+	}
 	cfg := common.LoadConfig()
 	state := fetch_state(&cfg)
 	Template(w, "view/app.html", state)
@@ -185,18 +204,27 @@ func fetch_state(cfg *common.Config) *AppViewState {
 }
 
 func add_mqtt_view_handler(w http.ResponseWriter, r *http.Request) {
+	if cors_shim(&w, r) {
+		return
+	}
 	state := &AppViewState{Tasmota: []tasmota.Device{}}
 	state.Tasmota = tasmota.Fetch()
 	Template(w, "view/addmqtt.html", state)
 }
 
 func hue_setup_view_handler(w http.ResponseWriter, r *http.Request) {
+	if cors_shim(&w, r) {
+		return
+	}
 	state := &SetupViewState{}
 	state.Cfg = common.LoadConfig()
 	Template(w, "view/huesetup.html", state)
 }
 
 func hue_pairing_handler(w http.ResponseWriter, r *http.Request) {
+	if cors_shim(&w, r) {
+		return
+	}
 	hueErr := hue.Pair()
 	if hueErr != nil {
 		log.Print("Hue pairing error ", hueErr.Error())
@@ -207,6 +235,9 @@ func hue_pairing_handler(w http.ResponseWriter, r *http.Request) {
 }
 
 func hue_scene_handler(w http.ResponseWriter, r *http.Request) {
+	if cors_shim(&w, r) {
+		return
+	}
 	sceneReq := r.URL.Path[len("/hue/scene/"):]
 	config := common.LoadConfig()
 	if config.Hue.Paired {
@@ -217,6 +248,9 @@ func hue_scene_handler(w http.ResponseWriter, r *http.Request) {
 }
 
 func hue_light_handler(w http.ResponseWriter, r *http.Request) {
+	if cors_shim(&w, r) {
+		return
+	}
 	lightReq := r.URL.Path[len("/hue/light/"):]
 	lightParam := strings.Split(lightReq, "/")
 	config := common.LoadConfig()
@@ -286,6 +320,9 @@ func static_handler(w http.ResponseWriter, r *http.Request) {
 }
 
 func tasmota_delete_handler(w http.ResponseWriter, req *http.Request) {
+	if cors_shim(&w, req) {
+		return
+	}
 	body, err := ioutil.ReadAll(req.Body)
 	if err != nil {
 		log.Print("IO error", err.Error())
@@ -305,6 +342,9 @@ func tasmota_delete_handler(w http.ResponseWriter, req *http.Request) {
 }
 
 func tasmota_add_handler(w http.ResponseWriter, req *http.Request) {
+	if cors_shim(&w, req) {
+		return
+	}
 	body, err := ioutil.ReadAll(req.Body)
 	if err != nil {
 		log.Print("Tasmota Error", err.Error())
@@ -322,6 +362,9 @@ func tasmota_add_handler(w http.ResponseWriter, req *http.Request) {
 }
 
 func mqtt_cmd_handler(w http.ResponseWriter, r *http.Request) {
+	if cors_shim(&w, r) {
+		return
+	}
 	cmdRequest := r.URL.Path[len("/mqtt/cmd/"):]
 	cmdRequest = strings.ReplaceAll(cmdRequest, "*", "#")
 	log.Print("Tasmota:", cmdRequest)
@@ -336,6 +379,9 @@ func mqtt_cmd_handler(w http.ResponseWriter, r *http.Request) {
 }
 
 func mqtt_stat_handler(w http.ResponseWriter, r *http.Request) {
+	if cors_shim(&w, r) {
+		return
+	}
 	cmdRequest := r.URL.Path[len("/mqtt/stat/"):]
 	log.Print("Tasmota:", cmdRequest)
 	cmds := strings.Split(cmdRequest, "/")

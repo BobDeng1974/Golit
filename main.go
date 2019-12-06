@@ -73,7 +73,7 @@ func setup() {
 }
 
 func main() {
-	log.Print("Golit v0.5.1")
+	log.Print("Golit v0.6")
 	setup()
 	cfg := common.LoadConfig()
 	http.HandleFunc("/", appview_handler)
